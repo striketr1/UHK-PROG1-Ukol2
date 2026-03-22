@@ -1,20 +1,31 @@
 package pro1.swingComponents;
 
-import pro1.drawingModel.*;
-import pro1.drawingModel.Rectangle;
-import pro1.utils.ColorUtils;
-
-import javax.swing.*;
-import java.awt.*;
+import java.awt.BorderLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+
+import pro1.drawingModel.Drawable;
+import pro1.drawingModel.Ellipse;
+import pro1.drawingModel.Group;
+import pro1.drawingModel.Line;
 
 public class MainFrame extends JFrame {
-    private DisplayPanel displayPanel;
+
+    private final DisplayPanel displayPanel;
     private int x;
     private int y;
     private String color = "#000000";
+    private ArrayList<Drawable> drawables = new ArrayList<>();
+    private ArrayList<int[]> circleCenters = new ArrayList<>();
+    private static int CIRCLE_RADIUS = 25;
+    private static int LINE_THICKNESS = 2;
+    private boolean showCircles = true;
 
+    // Tohle zůstává 
     public void setColor(String color) {
         this.color = color;
     }
@@ -37,19 +48,101 @@ public class MainFrame extends JFrame {
             public void mousePressed(MouseEvent e) {
                 MainFrame.this.x = e.getX();
                 MainFrame.this.y = e.getY();
-                MainFrame.this.showExample();
+                MainFrame.this.showCircle();
             }
         });
     }
 
-    public void showExample(){
-        MainFrame.this.displayPanel.setDrawable(this.example());
+    // Kolečko
+    private Drawable circle() {
+        circleCenters.add(new int[]{this.x, this.y});
+        return buildDisplay();
     }
 
-    private Drawable example() {
-        var d1 = new Ellipse(0, 0, 150, 250, this.color);
-        var d2 = new Text(0, 0, this.color);
-        var d3 = new Line(0, 50,170,170,3, this.color);
-        return new Group(new Drawable[]{d1, d2, d3}, this.x, this.y, 40, 1, 1);
+    private Drawable buildDisplay() {
+        this.drawables.clear();
+
+        // Jestli se mají zobrazovat kolečka, přidáme je do drawables
+        if (showCircles) {
+            for (int[] center : circleCenters) {
+                Ellipse circle = new Ellipse(center[0] - CIRCLE_RADIUS, center[1] - CIRCLE_RADIUS,
+                        CIRCLE_RADIUS * 2, CIRCLE_RADIUS * 2, this.color);
+                drawables.add(circle);
+            }
+        }
+
+        // Jestli se mají zobrazovat úsečky, přidáme je do drawables
+        if (showCircles && circleCenters.size() > 1) {
+            for (int i = 1; i < circleCenters.size(); i++) {
+                int[] currentCenter = circleCenters.get(i);
+                int closestIndex = findClosestCircle(currentCenter, i);
+                int[] closestCenter = circleCenters.get(closestIndex);
+
+                Line connectingLine = new Line(currentCenter[0], currentCenter[1],
+                        closestCenter[0], closestCenter[1],
+                        LINE_THICKNESS, this.color);
+                drawables.add(connectingLine);
+            }
+        }
+
+        // Pokud není nic k zobrazení, vrátíme prázdnou skupinu
+        if (drawables.isEmpty()) {
+            return new Group(new Drawable[0], 0, 0, 0, 1, 1);
+        }
+
+        Drawable[] drawablesArray = drawables.toArray(new Drawable[0]);
+        return new Group(drawablesArray, 0, 0, 0, 1, 1);
+    }
+
+    // Stejný jako originál showExample
+    public void showCircle() {
+        MainFrame.this.displayPanel.setDrawable(this.circle());
+    }
+
+    // Vymažu uložiště koleček a aktualizuji zobrazení
+    public void deleteCircles() {
+        this.circleCenters.clear();
+        this.displayPanel.setDrawable(null);
+    }
+
+    // Změna poloměru a překreslení
+    public void setCircleRadius(int radius) {
+        this.CIRCLE_RADIUS = radius;
+        this.refreshDisplay();
+    }
+
+    // Změna zobrazení a překreslení
+    public void setShowCircles(boolean showCircles) {
+        this.showCircles = showCircles;
+        this.refreshDisplay();
+    }
+
+    // Překreslení
+    private void refreshDisplay() {
+        if (circleCenters.isEmpty()) {
+            this.displayPanel.setDrawable(null);
+        } else {
+            this.displayPanel.setDrawable(this.buildDisplay());
+        }
+    }
+
+    // Najde index nejbližšího kolečka k novému kolečku, vyloučí kolečka s indexem >= excludeIndex
+    private int findClosestCircle(int[] newCenter, int excludeIndex) {
+        int closestIndex = -1;
+        double closestDistance = Double.MAX_VALUE;
+
+        // Matika kterou jsem našel na internetu
+        for (int i = 0; i < excludeIndex; i++) {
+            int[] center = circleCenters.get(i);
+            double distance = Math.sqrt(Math.pow(newCenter[0] - center[0], 2)
+                    + Math.pow(newCenter[1] - center[1], 2));
+
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestIndex = i;
+            }
+        }
+
+        return closestIndex;
     }
 }
